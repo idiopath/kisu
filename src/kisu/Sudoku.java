@@ -3,9 +3,7 @@
  */
 package kisu;
 
-import java.util.Arrays;
 import java.util.TreeSet;
-import java.util.function.IntUnaryOperator;
 
 /**
  * @author Idiopath
