@@ -1,0 +1,8 @@
+*.class
+
+# eclipse specific git ignore
+.project
+bin/**
+.classpath
+.settings/
+nppBackup/
