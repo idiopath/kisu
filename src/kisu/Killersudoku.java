@@ -3,8 +3,6 @@
  */
 package kisu;
 
-import kisu.Grid.Unit;
-
 /**
  * @author Idiopath
  *
@@ -30,7 +28,7 @@ public class Killersudoku extends Sudoku {
 		if (super.generateValues()) {
 			setSums();
 		
-			Show.showKillersudoku(g, sum, new SudokuCandidates(), value);
+			Show.showKillersudoku(sum, new int[0], value, 3, 4);
 		} else  {
 			System.out.println("Abbruch nach 10 Millionen Versuchen bei generateValue...");
 			return;
@@ -46,15 +44,15 @@ public class Killersudoku extends Sudoku {
 		int sums = setSums();
 		if (sums == sum.length) {
 			System.out.println("Das Killersudoku ist komplett.");
-			Show.showKillersudoku(g, sum, new SudokuCandidates(), value);
+			Show.showKillersudoku(sum, new int[0], value, 3, 4);
 		} else {
 			System.out.println(sums + " von " + sum.length + " Rahmen sind bereits befüllt:");
-			Show.showKillersudoku(g, sum, new SudokuCandidates(), value);
+			Show.showKillersudoku(sum, new int[0], value, 3, 4);
 			System.out.println("Jetzt wird der Rest generiert...");
 			if (generateValues()) {
 				setSums();
 
-				Show.showKillersudoku(g, sum, new SudokuCandidates(), value);
+				Show.showKillersudoku(sum, new int[0], value, 3, 4);
 			} else  {
 				System.out.println("Abbruch nach 10 Millionen Versuchen bei generateValue...");
 			}
@@ -63,7 +61,7 @@ public class Killersudoku extends Sudoku {
 	}
 
 	public boolean generateValues() {
-		SudokuCandidates can = new SudokuCandidates(g);
+		SudokuCandidates can = new SudokuCandidates();
 		int count = 0;
 		for (int i=0;i<value.length;i++) {
 			if (value[i] > 0) {
@@ -75,16 +73,24 @@ public class Killersudoku extends Sudoku {
 		}
 		can.commit();
 		System.out.println(count + " feste Kandidaten wurden gesetzt.");
-		Show.showKillersudoku(g, sum, can, value);
+		Show.showKillersudoku(sum, can.get(), value, 1, 2, 3, 4);
+		int[][] solutions = new int [1][];
+		
+		if (can.backtracking(solutions) > 0) {
+			value = solutions[0];
+			return true;
+		}
+		
+		return false;
 
-		return backtracking(can);
+//		return backtracking(can);
 	}
 	
 	public boolean verify() {
 		
-		SudokuCandidates can = new SudokuCandidates(g, sum);
+		SudokuCandidates can = new SudokuCandidates(sum);
 		
-		int[][] solutions = new int [2][];
+		int[][] solutions = new int [3][];
 		
 		int sol = can.backtracking(solutions);
 		
@@ -120,15 +126,16 @@ public class Killersudoku extends Sudoku {
 		if (frames.length() != 81)
 			throw new IllegalArgumentException("Killersudoku/frames: you need 81 values!");
 
-		g.setFrames(Frames.stringToArray(frames));
+		Grid.setFrames(Frames.stringToArray(frames));
 		
 	}
 	
 	private int setSums() {
-		sum = new int[g.position.size()];
+		sum = new int[Grid.countFrames()];
 		int ret = 0;
+		System.out.println(Grid.countFrames());
 		for (int i=0;i<sum.length;i++) {
-			for (int p : g.getPos(Unit.FRAME, i)) {
+			for (int p : Grid.getPosition(i, Unit.FRAME)) {
 
 				if (value[p] == 0) {
 					sum[i] = 0;
@@ -145,146 +152,13 @@ public class Killersudoku extends Sudoku {
 	public String getFrames() {
 		int [] frames = new int[81];
 		for (int i=0;i<81;i++) {
-			frames[i] = g.index.get(i).get(Unit.FRAME);
+			frames[i] = Grid.getIndex(i, Unit.FRAME);
 		}
 		return Frames.framesToString(frames);
 	}
 	
 	public void generate() {
 		generateValues();
-	}
-	
-	public void print() {
-		for (int i=0;i<g.position.size();i++) {
-			System.out.println("Pos " + i + ": " + g.position.get(i) + " Sum " + sum[i]);
-		}
-	}
-
-	public void showKillersudoku() {
-		System.out.println(" Kandidaten mit Lösungen                                "
-				+ " Kandidaten ohne Lösungen                               "
-				+ " Leeres Spielfeld                                       "
-				+ " Lösung                                               ");
-		for (int y=0;y<9;y++) 
-			for (int z=0;z<3;z++) { 
-				for (int x=0;x<9;x++) {
-					int xy = y*9+x;
-					String p = "";
-					if (z>0) {
-						if (x==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-1, Unit.FRAME))
-							p+= "|";
-						else p+= x%3==0 ? "¦" : " ";
-					
-					} else p+= " ";
-					if (z==0) {
-						if (y==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-9, Unit.FRAME)) {
-							if (xy == g.getPos(xy, Unit.FRAME)[0]) {
-								p+= g.getPos(xy, Unit.FRAME).length + "—";
-								p+= (sum[g.getIndex(xy, Unit.FRAME)] > 9 ? "" : "—") + sum[g.getIndex(xy, Unit.FRAME)] + "—";
-							} else p+= "—————";
-						} else p+= y%3 == 0 ? "- - -" : "     ";
-					} else {
-						p+="     ";
-//						for (int w=4;w>=0;w--)
-//							if (can.get(xy).size() == 1) {
-//								if (z == 1  && w  == 2)
-//									p+= can.get(xy).first();
-//								else if (z == 1 && (w == 1 || w == 3))
-//										p+= "*";
-//								else p+= " ";
-//							} else
-//								p+= can.get(xy).contains(z*5-w) ? z*5-w : " ";
-					}
-					System.out.print(p);
-				}
-				System.out.print(z>0?"| ":"  ");
-				// nur Kandidaten
-				for (int x=0;x<9;x++) {
-					int xy = y*9+x;
-					String p = "";
-					if (z>0) {
-						if (x==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-1, Unit.FRAME))
-							p+= "|";
-						else p+= x%3==0 ? "¦" : " ";
-					
-					} else p+= " ";
-					if (z==0) {
-						if (y==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-9, Unit.FRAME)) {
-							if (xy == g.getPos(xy, Unit.FRAME)[0]) {
-								p+= g.getPos(xy, Unit.FRAME).length + "—";
-								p+= (sum[g.getIndex(xy, Unit.FRAME)] > 9 ? "" : "—") + sum[g.getIndex(xy, Unit.FRAME)] + "—";
-							} else p+= "—————";
-						} else p+= y%3 == 0 ? "- - -" : "     ";
-					} else {
-						p+="     ";
-//						for (int w=4;w>=0;w--)
-//							if (can.get(xy).size() == 1) {
-//								p+= " ";
-//							} else
-//								p+= can.get(xy).contains(z*5-w) ? z*5-w : " ";
-					}
-					System.out.print(p);
-				}
-				System.out.print(z>0?"| ":"  ");
-				// leeres Feld
-				for (int x=0;x<9;x++) {
-					int xy = y*9+x;
-					String p = "";
-					if (z>0) {
-						if (x==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-1, Unit.FRAME))
-							p+= "|";
-						else p+= x%3==0 ? "¦" : " ";
-					
-					} else p+= " ";
-					if (z==0) {
-						if (y==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-9, Unit.FRAME)) {
-							if (xy == g.getPos(xy, Unit.FRAME)[0]) {
-								p+= g.getPos(xy, Unit.FRAME).length + "—";
-								p+= (sum[g.getIndex(xy, Unit.FRAME)] > 9 ? "" : "—") + sum[g.getIndex(xy, Unit.FRAME)] + "—";
-							} else p+= "—————";
-						} else p+= y%3 == 0 ? "- - -" : "     ";
-					} else {
-						p+="     ";
-					}
-					System.out.print(p);
-				}
-				System.out.print(z>0?"| ":"  ");
-				// Lösung
-				for (int x=0;x<9;x++) {
-					int xy = y*9+x;
-					String p = "";
-					if (z>0) {
-						if (x==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-1, Unit.FRAME))
-							p+= "|";
-						else p+= x%3==0 ? "¦" : " ";
-					
-					} else p+= " ";
-					if (z==0) {
-						if (y==0 || g.getIndex(xy, Unit.FRAME) != g.getIndex(xy-9, Unit.FRAME)) {
-							if (xy == g.getPos(xy, Unit.FRAME)[0]) {
-								p+= g.getPos(xy, Unit.FRAME).length + "—";
-								p+= (sum[g.getIndex(xy, Unit.FRAME)] > 9 ? "" : "—") + sum[g.getIndex(xy, Unit.FRAME)] + "—";
-							} else p+= "—————";
-						} else p+= y%3 == 0 ? "- - -" : "     ";
-					} else {
-						p+= z==1 ? (" *" + value[xy] + "* ") : "     ";  
-					}
-					System.out.print(p);
-				}
-				System.out.println(z>0?"|":" ");
-			}
-		System.out.println(" ————— ————— ————— ————— ————— ————— ————— ————— —————  "
-				+ " ————— ————— ————— ————— ————— ————— ————— ————— —————  "
-				+ " ————— ————— ————— ————— ————— ————— ————— ————— —————  "
-				+ " ————— ————— ————— ————— ————— ————— ————— ————— ————— ");
-		int c=0;
-		int v=0;
-//		for (TreeSet<Integer> z : can) {
-//			c+=z.size();
-//			if (z.size() == 1) v++;
-//		}
-		
-		System.out.println("Noch sinds " + (c-v) + " Kandidaten, aber " + v + " Werte sind schon gefunden.");
 	}
 
 }

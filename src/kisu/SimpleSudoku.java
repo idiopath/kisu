@@ -16,8 +16,6 @@ public class SimpleSudoku extends Sudoku {
 	public SimpleSudoku() {
 		super();
 	}
-
-	
 	
 	public void generate() {
 		

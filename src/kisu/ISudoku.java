@@ -13,5 +13,4 @@ public interface ISudoku {
 	
 	public void generate();
 	
-	public void print();
 }

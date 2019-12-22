@@ -4,9 +4,9 @@
 package kisu;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.TreeSet;
 
-import kisu.Grid.Unit;
 
 /**
  * @author Idiopath
@@ -14,8 +14,7 @@ import kisu.Grid.Unit;
  */
 public class SudokuCandidates {
 
-	private Grid grid;
-	private int[] sums;
+	private SudokuRules rules;
 	private int[] can;
 	private int[] save;
 
@@ -24,23 +23,14 @@ public class SudokuCandidates {
 	 */
 	public SudokuCandidates() {
 		can = new int[81];
-		Arrays.fill(can, 0b111111111);
-		sums = new int[81];
+		Arrays.fill(can, Candidates.all);
+		rules = new SudokuRules();
 		commit();
 	}
-	
-	public SudokuCandidates(Grid grid) {
+
+	public SudokuCandidates(int[] sums) {
 		this();
-		this.grid = grid;
-	}
-	
-	public SudokuCandidates(Grid grid, int[] sums) {
-		this(grid);
-		this.sums = sums;
-	}
-	
-	private SudokuCandidates(int x) {
-		
+		rules.setSums(sums);
 	}
 	
 	public void set(int [] candidates) {
@@ -60,48 +50,22 @@ public class SudokuCandidates {
 		can = save.clone();
 	}
 	
-	public TreeSet<Integer> get(int xy) {
-		if (can.length == 0)
-			return null;
-		TreeSet<Integer> ret = new TreeSet<Integer>();
-		int n = 1;
-		for (int i=1;i<10;i++) {
-			if ((save[xy] & n) > 0) {
-				ret.add(i);
-			}
-			n = n<<1;
-		}
-		return ret;
-	}
-	
-	public int getFirst(int xy) {
-		return Integer.lowestOneBit(can[xy]);
+	public Set<Integer> get(int xy) {
+		return Candidates.values(save[xy]);
 	}
 	
 	public boolean remove(int xy, int val) {
-		return rem(xy, 1 << (val-1));
+		return rem(xy, Candidates.candidate(val));
 	}
 	
-	public boolean remove(int xy, TreeSet<Integer> val) {
-		int bits = 0;
-		for (int i : val) {
-			bits+= 1 << (i - 1);
-		}
-		return rem(xy, bits);
+	public boolean remove(int xy, Set<Integer> val) {
+		return rem(xy, Candidates.candidates(val));
 	}
 	
 	private boolean rem(int xy, int bits) {
-		if (can[xy] == bits) {
-			return false;
-		}
-
-		if ((can[xy] & bits) == 0) { // nicht enhalten = keine Änderung
-			return true;
-		}
-
-		can[xy] = can[xy] & (511 ^ (bits));
+		can[xy] &= Candidates.not(bits);
 		
-		return true;
+		return can[xy] != 0;
 	}
 	
 	public boolean changed() {
@@ -111,7 +75,7 @@ public class SudokuCandidates {
 	public int countSure() {
 		int count = 0;
 		for (int i : save) {
-			if (Integer.bitCount(i) == 1) {
+			if (Candidates.count(i) == 1) {
 				count++;
 			}
 		}
@@ -121,7 +85,7 @@ public class SudokuCandidates {
 	public int[] posWithCandidates() {
 		TreeSet<Integer> pos = new TreeSet<Integer>();
 		for (int i=0;i<can.length;i++) {
-			if (Integer.bitCount(can[i]) > 1) {
+			if (Candidates.count(can[i]) > 1) {
 				pos.add(i);
 			}
 		}
@@ -133,28 +97,11 @@ public class SudokuCandidates {
 		return ret;
 	}
 	
-	public SudokuCandidates clone() {
-		SudokuCandidates ret = new SudokuCandidates(0);
-		ret.can = can.clone();
-		ret.save = save.clone();
-		ret.grid = grid;
-		ret.sums = sums.clone();
-		
-		return ret;
-	}
-	
-	public int setNext(int xy) {
-		int ret;
-		if ((ret = Integer.lowestOneBit(can[xy])) > 0) {
-			can[xy] -= ret;
-		}
-		return ret;
-	}
 	
 	public int backtracking(int[][] solution) {
 		int [] pos = posWithCandidates();
 		int [][] save = new int[pos.length][81];
-
+		
 		int solutions = 0;
 		int p = 0;
 		int count = 0;
@@ -165,16 +112,26 @@ public class SudokuCandidates {
 		do {
 			if (++count % 1000000 == 0)
 				System.out.println(s + " " + count + " min " + min + " max " + max);
-
+//			if (pos[p] == 41) {
+//				Show.showKillersudoku(grid, sums, this, new int[0]);
+//				System.exit(0);
+//			}
+			long start = System.currentTimeMillis();
+//			if (p == 57) rules.debug = true;
 			int rest = findNextCandidate(pos[p]);
-			s.setCharAt(p, (char)('0' + Integer.bitCount(rest)));
+			s.setCharAt(p, (char)('0' + Candidates.count(rest)));
+			System.out.println(count + ". p=" + p + " pos[p]=" + pos[p] + ", " + (System.currentTimeMillis() - start) + "ms");
+//			Show.showKillersudoku(new int[0], can, new int[0], 1);
+
+//			if (p == 57) System.exit(0);
 			
-			if (getFirst(pos[p]) > 0) {
+			if (Candidates.first(can[pos[p]]) > 0) {
 				if (p + 1 == pos.length) {
 					System.out.println(solutions+1 + ". Lösung gefunden, von gesuchten " + solution.length + " nach " + count + " Durchgängen...");
-					Show.showKillersudoku(grid, sums, this, new int[0]);
+//					Show.showKillersudoku(sums, this, new int[0]);
 					int [] sol = can.clone();
-					Arrays.setAll(sol, i -> Integer.numberOfTrailingZeros(sol[i]) + 1);
+					Arrays.setAll(sol, i -> Candidates.value(sol[i]));
+					Show.showKillersudoku(new int[0], new int[0], sol, 3, 4);
 					solution[solutions] = sol;
 					if (++solutions == solution.length)
 						break;
@@ -185,6 +142,11 @@ public class SudokuCandidates {
 					
 					p++;
 					max = pos[p] > max ? pos[p] : max;
+//					if (pos[p] == 1) {
+//						Show.showKillersudoku(new int[0], can, new int[0], 1, 2, 3, 4);
+//						System.exit(0);
+//					}
+						
 					continue;
 				}
 			} 
@@ -197,7 +159,7 @@ public class SudokuCandidates {
 				set(save[p]);
 			} else {
 //				can.rollback();
-				setCandidates(pos[p], rest);
+				can[pos[p]] = rest;
 			}
 			
 		} while (count < 10000000);
@@ -220,105 +182,31 @@ public class SudokuCandidates {
 	public int findNextCandidate(int xy) {
 		int ret = can[xy];
 		int test;
-		while ((test = Integer.lowestOneBit(ret)) > 0) {
+//		Crossing c = new Crossing();
+		while ((test = Candidates.first(ret)) > 0) {
 			can[xy] = test;
 			ret -= test;
-			boolean success = applyOneRule(xy);
-			if (success) {
+
+			if (rules.applyRules(xy, can))
 				break;
-			} else {
-				rollback();
-				can[xy] = 0;
-			}
+//			Set<Integer> changed = c.eliminateCrosses(xy, can); 
+//			if (changed != null) {
+//				one.addTodo(changed);
+//				if (one.applyOneRule(xy, can)) {
+//					break;
+//				}
+//			}
+			rollback();
+			can[xy] = 0;
 		}
 		return ret;
 	}
-	
-	public void setCandidates(int xy, int candidates) {
-		can[xy] = candidates;
-	}
+
 	
 	public boolean setCandidate(int xy, int value) {
-		can[xy] = 1 << (value - 1);
+		can[xy] = Candidates.candidate(value);
 
-		return applyOneRule(xy);
-	}
-	
-	private boolean applyOneRule(int xy) {
-
-		for (Unit u : Unit.values()) {
-			if (!applyOneRule(xy, u)) {
-				return false;
-			}
-		}
-		
-		return true;
-	}
-	
-	private boolean applyOneRule(int xy, Unit u) {
-		int [] positions = grid.getPos(xy, u);
-		if (positions.length > 0) {
-			int [] can = new int[positions.length]; 
-			for (int i=0;i<positions.length;i++) {
-				can[i] = this.can[positions[i]];
-			}
-			can = applyOneRule(can, u == Unit.FRAME ? sums[grid.getIndex(xy, u)] : 0);
-
-			if (can[0] == 0)
-				return false;
-			for (int i=0;i<positions.length;i++) {
-				if (this.can[positions[i]] == can[i])
-					continue;
-				this.can[positions[i]] = can[i];
-			}
-		}
-		return true;
-	}
-	
-	private int[] applyOneRule(int [] can, int sum) {
-		int [] ret = new int[can.length];
-		
-		if (can.length == 1) {
-			if (sum > 0)
-				ret[0] = (can[0] & (1 << (sum-1))); // wenn Summe als Kandidat enthalten, sonst 0
-			else
-				ret = can;
-
-			return ret;
-		}
-		
-		int i = Integer.lowestOneBit(can[0]);
-		int value = 0;
-		
-		while (i <= Integer.highestOneBit(can[0])) {
-			if ((i & can[0]) > 0) {
-				if (sum > 0) {
-					do {
-						value++;
-					} while (i > 1 << (value - 1));
-					if (value >= sum)
-						break;
-				}
-				int[] r = new int[can.length - 1];
-				for (int j=0;j<r.length;j++) {
-					r[j] = can[j+1] - (can[j+1] & i); // Subliste ohne akt. ausgewählten Kandidat
-					if (r[j] == 0)
-						break;
-					
-				}
-				if (r[r.length-1] > 0) {
-					r = applyOneRule(r, sum - value);
-					if (r[0] > 0) {
-						ret[0] |= i;
-						for (int j=0;j<r.length;j++) {
-							ret[j+1] |= r[j];
-						}
-					}
-				}
-			}
-			i = i << 1;
-		}
-		return ret;
+		return rules.applyRules(xy, can);
 	}
 
 }
